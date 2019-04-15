@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+WARN=30          # days before cert expires
+
+SSH_CERTS=( /opt/SSH-CA/certs/*.pub )
+SSH_CERTS+=( ~/.ssh/*.pub )
+
+now=$(date +%s)
+WARN_SECONDS=$(( WARN * 24 * 60 * 60))
+
+for cert in ${SSH_CERTS[@]} ; do
+
+ valid=$(ssh-keygen -L -f "$cert" 2>/dev/null | grep -i valid)
+
+ [[ -z $valid ]] && continue
+ [[ $valid == *"forever"* ]] && echo "0 $cert - SSH Cert valid ( forever )" && continue
+
+ valid_from=$(echo $valid | awk '{print $3}')
+ valid_from_epoch=$(date -d "$valid_from" +%s)
+ valid_to=$(echo $valid | awk '{print $5}')
+ valid_to_epoch=$(date -d "$valid_to" +%s)
+ valid_to_epoch_warning=$(( valid_to_epoch - WARN_SECONDS ))
+
+ expires_in_days=$((  WARN - ( ( now - valid_to_epoch_warning ) / 60 / 60 / 24 ) -1 ))
+
+ [[ $now -lt $valid_from_epoch ]] && echo "1 $cert - SSH Cert not valid yet ( $valid_from -> $valid_to )" && continue
+ [[ $now -gt $valid_to_epoch ]] && echo "2 $cert - SSH Cert expired ( $valid_from -> $valid_to )" && continue
+ [[ $now -gt $valid_to_epoch_warning ]] && echo "1 $cert - SSH Cert expires in $expires_in_days day(s) ( $valid_from -> $valid_to )" && continue
+ [[ $now -gt $valid_from_epoch && $now -lt $valid_to_epoch ]] && echo "0 $cert - SSH Cert valid ( $valid_from -> $valid_to )" && continue
+
+done
+
