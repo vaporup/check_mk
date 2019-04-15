@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+ 
+TIMEOUT=5
+HEALTH=$(timeout ${TIMEOUT} ceph health)
+ 
+RETVAL=$?
+ 
+[[ $RETVAL -eq 124 ]] && echo "2 Ceph - ceph health timed out (${TIMEOUT}s), potential loss of quorum!" && exit
+ 
+[[ "$HEALTH" != 'HEALTH_OK' ]] && echo "2 Ceph - $HEALTH" && exit
+[[ "$HEALTH" == 'HEALTH_OK' ]] && echo "0 Ceph - $HEALTH" && exit
