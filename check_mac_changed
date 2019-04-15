@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#  +--------------------------------------------------------------------------------------+
+#  |                                                                                      |
+#  | Description  : Cheap check to monitor if a network MAC address has changed           |
+#  |                                                                                      |
+#  |                Can be used for example to detect                                     |
+#  |                if someone did a P2V or similar without notifying you                 |
+#  |                                                                                      |
+#  +--------------------------------------------------------------------------------------+
+
+INTERFACE="enp0s25"                 # which interface to check
+MAC_PREVIOUS="6c:3b:e5:f2:5d:8b"    # enter the MAC address which should not change
+
+#
+# Do not change anything below here
+#
+
+MAC_FILE="/sys/class/net/${INTERFACE}/address"
+
+if [ -f "${MAC_FILE}" ]; then
+
+    MAC_CURRENT=$( cat "${MAC_FILE}" )
+
+    if [[ "${MAC_CURRENT}" = "${MAC_PREVIOUS}" ]]; then
+        echo "0 MAC_ADDRESS_CHANGE - Same MAC address since last check ( PREVIOUS: ${MAC_PREVIOUS} CURRENT: ${MAC_CURRENT} )"
+    else
+        echo "2 MAC_ADDRESS_CHANGE - Different MAC address since last check ( PREVIOUS: ${MAC_PREVIOUS} CURRENT: ${MAC_CURRENT} )"
+    fi
+
+else
+    echo "1 MAC_ADDRESS_CHANGE - File ${MAC_FILE} not found"
+fi
