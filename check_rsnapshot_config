@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+output=$( rsnapshot configtest 2>&1 | grep -i -P 'error|ok' | head -1 )
+
+if [[ ${output} == *"Syntax OK"* ]]; then
+    echo "0 rsnapshot_config - ${output}"
+else
+    echo "2 rsnapshot_config - ${output}"
+fi
+
