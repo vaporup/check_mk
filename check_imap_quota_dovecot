@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+QUOTA_WARNING="90"
+QUOTA_CRITICAL="95"
+
+doveadm -f tab quota get -u '*' | grep STORAGE | awk '{print $1, $7}' | while read line ; do
+
+    QUOTA_USER=$( echo "$line" | awk '{print $1}')
+    QUOTA_USAGE=$(echo "$line" | awk '{print $2}')
+
+    if [[ ${QUOTA_USAGE} -gt ${QUOTA_CRITICAL} ]]; then
+      echo "2 IMAP_QUOTA_${QUOTA_USER} quota_percent=${QUOTA_USAGE} ${QUOTA_USAGE}%"
+      continue
+    fi
+
+    if [[ ${QUOTA_USAGE} -gt ${QUOTA_WARNING} ]]; then
+      echo "1 IMAP_QUOTA_${QUOTA_USER} quota_percent=${QUOTA_USAGE} ${QUOTA_USAGE}%"
+      continue
+    fi
+
+    echo "0 IMAP_QUOTA_${QUOTA_USER} quota_percent=${QUOTA_USAGE} ${QUOTA_USAGE}%"
+
+done

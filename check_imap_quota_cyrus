@@ -1,0 +1,63 @@
+#!/bin/bash
+
+QUOTA_FOLDER="/srv/var/lib/imap/quota/"
+
+WARNING="95"
+CRITICAL="97"
+
+find "$QUOTA_FOLDER" -name 'user.*' |
+
+while read filename
+  do
+
+    USAGE=$(sed '1q;d' "$filename")
+    QUOTA_KB=$(sed '2q;d' "$filename")
+    let QUOTA="$QUOTA_KB * 1024"
+    let QUOTA_PERCENT="$USAGE * 100 / $QUOTA"
+
+    USERNAME=$(printf "$filename" | cut -f 1 -d '.' --complement)
+
+    if [ "${QUOTA_PERCENT}" -ge "${CRITICAL}" ]
+        then
+            printf "2 IMAP_Quota_${USERNAME} usage=${QUOTA_PERCENT} %s %% used. %s / %s bytes\n" "${QUOTA_PERCENT}" "${USAGE}" "${QUOTA}"
+
+    elif [ "${QUOTA_PERCENT}" -ge "${WARNING}" ]
+        then
+            printf "1 IMAP_Quota_${USERNAME} usage=${QUOTA_PERCENT} %s %% used. %s / %s bytes\n" "${QUOTA_PERCENT}" "${USAGE}" "${QUOTA}"
+    else
+            printf "0 IMAP_Quota_${USERNAME} usage=${QUOTA_PERCENT} %s %% used. %s / %s bytes\n" "${QUOTA_PERCENT}" "${USAGE}" "${QUOTA}"
+    fi
+
+
+
+done
+
+#
+# https://lists.andrew.cmu.edu/pipermail/info-cyrus/2006-December/024751.html
+#
+
+# Quotas are stored in plain text files in /var/imap/quota.
+#
+# Directory is hashed by user's login first character ( 'q' if it's not in 'a'-'z' range ).
+#
+# Filename is user's mailbox name ( eg. 'user.<login>' ).
+#
+# First line is current usage in bytes 
+# Second line is user's quota in kilobytes.
+#
+# Example:
+#
+# mail1# pwd
+# /var/imap/quota
+# mail1# cat m/user.mjawimap
+# 866269772
+# 1024000
+#
+# mjawimap user has 1GB quota and uses about 825MB out of it 
+# ( 84% usage ).
+#
+# Bottomline is you can play with these files without any restrictions. 
+# You can change it, generate manually or from robot and it will all be seen properly by cyrus.
+#
+# Mentioned everyday quota warning checker can be a simple oneliner then.
+
