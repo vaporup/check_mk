@@ -18,7 +18,7 @@ MAC_PREVIOUS="6c:3b:e5:f2:5d:8b"    # enter the MAC address which should not cha
 
 MAC_FILE="/sys/class/net/${INTERFACE}/address"
 
-if [ -f "${MAC_FILE}" ]; then
+if [[ -f "${MAC_FILE}" ]]; then
 
     MAC_CURRENT=$( cat "${MAC_FILE}" )
 
