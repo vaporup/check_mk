@@ -8,7 +8,6 @@
 # https://docs.netgate.com/pfsense/en/latest/backup/remote-config-backup.html
 # https://www.proteansec.com/linux/pfsense-automatically-backup-configuration-files/
 # https://fattylewis.com/2015/08/15/script-to-back-up-pfsense-config/
-# 
 #
 
     WARN_DAYS=60
