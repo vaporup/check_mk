@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+#
+# Just get the config.xml file
+#
+# This check uses the Web API with curl
+#
+# https://wiki.opnsense.org/development/api/plugins/backup-api.html
+#
+
+    WARN_DAYS=60
+         WARN=$(( WARN_DAYS * 24 * 60 * 60 ))
+
+     EXCLUDES=()
+   #EXCLUDES+=("00:E2:23:80:22:3B:C0:23:55:47:51:77:E9:26:93:62:AF:0C:56:F1")
+      CA_HOST="server2.domain.local"
+ CHECK_PREFIX="server2"
+      COUNTER=0
+
+ API_ENDPOINT="https://server2.domain.local:25443/api/backup/backup/download"
+      API_KEY="A_KEY"
+   API_SECRET="A_SECRET"
+
+for cert in $( curl --silent -u "$API_KEY":"$API_SECRET" "$API_ENDPOINT" | xmlstarlet sel -t -m "//*/crt" -v . -n ); do
+
+         DATA=$( echo "$cert" | base64 -d )
+  FINGERPRINT=$( echo "$DATA" | openssl x509 -noout -fingerprint | sed 's/SHA1 Fingerprint=//' )
+
+  if [[ " ${EXCLUDES[@]} " =~ " ${FINGERPRINT} " ]]; then
+    continue
+  fi
+
+  (( COUNTER++ ))
+
+        SUBJECT=$( echo "$DATA" | openssl x509 -noout -subject   | sed 's/subject=//'   )
+     START_DATE=$( echo "$DATA" | openssl x509 -noout -startdate | sed 's/notBefore=//' )
+       END_DATE=$( echo "$DATA" | openssl x509 -noout -enddate   | sed 's/notAfter=//'  )
+  END_DATE_UNIX=$( date -d "$END_DATE" +%s )
+            NOW=$( date +%s )
+
+   VALID_WINDOW=$(( ( END_DATE_UNIX - NOW ) / 60 / 60 / 24 ))
+
+  if [[ ${VALID_WINDOW} -lt 0 ]]; then
+
+    VALID=0
+
+  else
+
+    VALID=${VALID_WINDOW}
+
+  fi
+
+  if [[ ${END_DATE_UNIX} -lt ${NOW} ]]; then
+
+    printf "2 CERT_%s_%03i valid_days=%s %s | %s | %s\n" "${CHECK_PREFIX}" "$COUNTER" "$VALID" "$SUBJECT" "NotValidBefore: $START_DATE" "NotValidAfter: $END_DATE"
+
+  elif [[ $(( END_DATE_UNIX - WARN )) -lt ${NOW} ]]; then
+
+    printf "1 CERT_%s_%03i valid_days=%s %s | %s | %s\n" "${CHECK_PREFIX}" "$COUNTER" "$VALID" "$SUBJECT" "NotValidBefore: $START_DATE" "NotValidAfter: $END_DATE"
+
+  else
+
+    printf "0 CERT_%s_%03i valid_days=%s %s | %s | %s\n" "${CHECK_PREFIX}" "$COUNTER" "$VALID" "$SUBJECT" "NotValidBefore: $START_DATE" "NotValidAfter: $END_DATE"
+
+  fi
+
+done
