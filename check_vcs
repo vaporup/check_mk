@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+
+#  +--------------------------------------------------------------------------------------+
+#  |                                                                                      |
+#  | Description  : Checks all SVN and GIT repositories                                   |
+#  |                for unversioned, uncommited and unpushed files                        |
+#  |                                                                                      |
+#  +--------------------------------------------------------------------------------------+
+
+WORK_DIRS=( "/home/" )
+
+MAX_DEPTH=8                                   # how deep we want to go into the rabbit hole ( WORK_DIRS )
+                                              # not used for SVN repos when SVN version < 1.7
+
+function get_svn_version () { 
+
+  #
+  # Examples
+  #
+
+  # svn, version 1.5.8 (r934486)
+  # svn, version 1.6.11 (r934486)
+  # svn, version 1.6.17 (r1128011)
+  # svn, Version 1.6.17 (r1128011)
+  # svn, version 1.8.8 (r1568071)
+  # svn, Version 1.8.8 (r1568071)
+  # svn, Version 1.9.3 (r1718519)
+  # svn, Version 1.9.7 (r1800392)
+
+  svn --version | awk '/svn, (v|V)ersion/ { print $3 }'
+
+  #
+  # for debugging
+  #
+
+  #echo "svn, version 1.5.8 (r934486)" | awk '/svn, (v|V)ersion/ { print $3 }'
+
+}
+
+function get_git_version () { 
+
+  #
+  # Examples
+  #
+
+  # git version 1.7.1
+  # git version 1.7.9.5
+  # git version 1.9.1
+  # git version 2.7.4
+  # git version 2.17.1
+  # git version 2.18.0
+
+
+  git --version | awk '/git (v|V)ersion/ { print $3 }'
+
+  #
+  # for debugging
+  #
+
+  #echo "git version 1.7.9.5" | awk '/git (v|V)ersion/ { print $3 }'
+
+}
+
+function svn_is_older_version () {
+
+  #
+  # With Subversion 1.7 there is now only one .svn folder like in Git.
+  # So we can use "find" to find all Subversion repos
+  # and ignore svn:externals when checking
+  #
+
+  echo ${SVN_VERSION} | grep -i -q -E '\s*1\.(5|6)' && return 0 || return 1
+
+}
+
+function git_is_older_version () {
+
+  echo ${GIT_VERSION} | grep -i -q -E '^s*1\.' && return 0 || return 1
+
+}
+
+function check_svn () {
+
+  for SVN_DIR in ${SVN_DIRS[@]}; do
+
+    #
+    # Check if svn status works
+    #
+
+    LC_ALL=de_DE.UTF-8 /usr/bin/svn status ${SVN_DIR} &> /dev/null
+
+    RETVAL=$?
+
+    if [[ $RETVAL -ne 0 ]]
+      then
+        echo "2 VCS_SVN_${SVN_DIR} - svn command not able to get status"
+        continue
+    fi
+
+    if svn_is_older_version; then
+
+       uncommited=$(LC_ALL=de_DE.UTF-8 /usr/bin/svn status ${SVN_DIR} | grep -c -P "^\s*(\M|\!)")
+      unversioned=$(LC_ALL=de_DE.UTF-8 /usr/bin/svn status ${SVN_DIR} | grep -c -P "^\?")
+
+    else
+
+       uncommited=$(LC_ALL=de_DE.UTF-8 /usr/bin/svn status --ignore-externals ${SVN_DIR} | grep -c -P "^\s*(\M|\!)")
+      unversioned=$(LC_ALL=de_DE.UTF-8 /usr/bin/svn status --ignore-externals ${SVN_DIR} | grep -c -P "^\?")
+
+    fi
+
+    #
+    # Repository is clean
+    #
+
+    if [[ "$uncommited" -eq 0  &&  "$unversioned" -eq 0 ]]
+      then
+        echo "0 VCS_SVN_${SVN_DIR} - No uncommited or unversioned files"
+    fi
+
+    #
+    # Uncommited files detected
+    #
+
+    if [ "$uncommited" -ne 0 ]
+      then
+        echo "2 VCS_SVN_${SVN_DIR} - $uncommited file(s) uncomitted "
+    fi
+
+    #
+    # Some files not under version control
+    #
+
+    if [ "$unversioned" -ne 0 ]
+      then
+        echo "1 VCS_SVN_${SVN_DIR} - $unversioned file(s) not under version control"
+    fi
+
+  done
+
+}
+
+function check_git () {
+
+  for GIT_DIR in ${GIT_DIRS[@]}; do
+
+    #
+    # Check if git status works
+    #
+
+    LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status -s &> /dev/null
+
+    RETVAL=$?
+
+    if [[ $RETVAL -ne 0 ]]
+      then
+        echo "2 VCS_GIT_${GIT_DIR} - git command not able to get status"
+        continue
+    fi
+
+     uncommited=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*[A-Z]' )
+    unversioned=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*?'     )
+       unpushed=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status             | grep -c 'push'      )
+
+    #
+    # Repository is clean
+    #
+
+    if [[ "$uncommited" -eq 0  &&  "$unversioned" -eq 0 && "$unpushed" -eq 0 ]]
+      then
+        echo "0 VCS_GIT_${GIT_DIR} - No uncommited, unversioned or unpushed files"
+    fi
+
+    #
+    # Uncommited or unpushed files detected
+    #
+
+    if [[ "$uncommited" -ne 0 || "$unpushed" -ne 0 ]]
+      then
+        echo "2 VCS_GIT_${GIT_DIR} - $uncommited file(s) uncomitted, $unpushed file(s) unpushed"
+    fi
+
+    #
+    # Some files not under version control
+    #
+
+    if [[ "$unversioned" -ne 0 ]]
+      then
+        echo "1 VCS_GIT_${GIT_DIR} - $unversioned file(s) not under version control"
+    fi
+
+  done
+
+}
+
+#
+# Locking
+#
+
+LOCK_FILE="/var/tmp/${0##*/}-$USER"           # script name
+
+exec 200>${LOCK_FILE}
+flock -n 200 || { echo "Script already running" >&2; exit 1 ; }
+
+SVN_DIRS=()
+GIT_DIRS=()
+
+SVN_VERSION=$( get_svn_version )
+GIT_VERSION=$( get_git_version )
+
+#
+# Find all SVN and GIT repositories,
+#
+
+for WORK_DIR in ${WORK_DIRS[@]}; do
+
+  if [ -d "$WORK_DIR" ]; then
+
+    if svn_is_older_version; then
+
+      for SUBDIR in $WORK_DIR*/; do
+
+        if [[ -d $SUBDIR/.svn ]]; then
+          SVN_DIRS+=( $SUBDIR ) 
+        fi
+
+      done
+
+      for SUBDIR in $( find "$WORK_DIR" -maxdepth $MAX_DEPTH -type d -name .git -exec dirname {} \; 2>/dev/null ); do
+
+        if [[ -d $SUBDIR/.git ]]; then
+          GIT_DIRS+=( $SUBDIR ) 
+        fi
+
+      done
+
+    else
+
+    for SUBDIR in $( find "$WORK_DIR" -maxdepth $MAX_DEPTH  -type d -name .svn  -exec dirname {} \; -or -name .git -exec dirname {} \; 2>/dev/null | sort ); do
+
+        if [[ -d $SUBDIR/.svn ]]; then
+          SVN_DIRS+=( $SUBDIR ) 
+        fi
+
+        if [[ -d $SUBDIR/.git ]]; then
+          GIT_DIRS+=( $SUBDIR ) 
+        fi
+
+    done
+
+    fi
+
+  fi
+
+done
+
+
+#
+# then check their status
+#
+
+check_git
+check_svn
