@@ -158,9 +158,9 @@ function check_git () {
         continue
     fi
 
-     uncommited=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*[A-Z]' )
-    unversioned=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*?'     )
-       unpushed=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status             | grep -c 'push'      )
+     uncommited=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*[A-Z]'         )
+    unversioned=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*?'             )
+       unpushed=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git log --branches --not --remotes --oneline | wc -l )
 
     #
     # Repository is clean
@@ -168,7 +168,7 @@ function check_git () {
 
     if [[ "$uncommited" -eq 0  &&  "$unversioned" -eq 0 && "$unpushed" -eq 0 ]]
       then
-        echo "0 VCS_GIT_${GIT_DIR} - No uncommited, unversioned or unpushed files"
+        echo "0 VCS_GIT_${GIT_DIR} - No uncommited, unversioned files or unpushed commits"
     fi
 
     #
@@ -177,7 +177,7 @@ function check_git () {
 
     if [[ "$uncommited" -ne 0 || "$unpushed" -ne 0 ]]
       then
-        echo "2 VCS_GIT_${GIT_DIR} - $uncommited file(s) uncomitted, $unpushed file(s) unpushed"
+        echo "2 VCS_GIT_${GIT_DIR} - $uncommited file(s) uncomitted, $unpushed commit(s) unpushed"
     fi
 
     #
