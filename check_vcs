@@ -2,7 +2,7 @@
 
 #  +--------------------------------------------------------------------------------------+
 #  |                                                                                      |
-#  | Description  : Checks all SVN and GIT repositories                                   |
+#  | Description  : Checks all SVN and Git repositories                                   |
 #  |                for unversioned, uncommited and unpushed files                        |
 #  |                                                                                      |
 #  +--------------------------------------------------------------------------------------+
