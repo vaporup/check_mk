@@ -11,6 +11,7 @@ WORK_DIRS=( "/home/" )
 
 MAX_DEPTH=8                                   # how deep we want to go into the rabbit hole ( WORK_DIRS )
                                               # not used for SVN repos when SVN version < 1.7
+SHY_FILE="monitoring.shy"
 
 function get_svn_version () { 
 
@@ -145,10 +146,29 @@ function check_git () {
   for GIT_DIR in ${GIT_DIRS[@]}; do
 
     #
+    # Compare owner of Git working copy and its index file
+    # because sometimes git status changes .git/index
+    #
+    # See
+    #
+    # https://stackoverflow.com/a/47439096
+    # https://github.com/git/git/commit/27344d6a6c8056664966e11acf674e5da6dd7ee3
+    #
+
+      GIT_OWNER=$( stat -c '%U' ${GIT_DIR} )
+    INDEX_OWNER=$( stat -c '%U' ${GIT_DIR}/.git/index )
+
+    if [[ ${GIT_OWNER} != ${INDEX_OWNER} ]]
+      then
+        echo "2 VCS_GIT_${GIT_DIR} - owner of Git Working Directory and Git Index are different"
+        continue
+    fi
+
+    #
     # Check if git status works
     #
 
-    LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status -s &> /dev/null
+    LC_ALL=de_DE.UTF-8 cd ${GIT_DIR} && sudo -n -u ${GIT_OWNER} /usr/bin/git status -s &> /dev/null
 
     RETVAL=$?
 
@@ -158,9 +178,9 @@ function check_git () {
         continue
     fi
 
-     uncommited=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*[A-Z]'         )
-    unversioned=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git status --porcelain | grep -c '^\s*?'             )
-       unpushed=$(LC_ALL=de_DE.UTF-8 /usr/bin/git --work-tree ${GIT_DIR} --git-dir ${GIT_DIR}/.git log --branches --not --remotes --oneline | wc -l )
+     uncommited=$(LC_ALL=de_DE.UTF-8 cd ${GIT_DIR} && sudo -n -u ${GIT_OWNER} /usr/bin/git status --porcelain | grep -c '^\s*[A-Z]'         )
+    unversioned=$(LC_ALL=de_DE.UTF-8 cd ${GIT_DIR} && sudo -n -u ${GIT_OWNER} /usr/bin/git status --porcelain | grep -c '^\s*?'             )
+       unpushed=$(LC_ALL=de_DE.UTF-8 cd ${GIT_DIR} && sudo -n -u ${GIT_OWNER} /usr/bin/git log --branches --not --remotes --oneline | wc -l )
 
     #
     # Repository is clean
@@ -220,7 +240,7 @@ for WORK_DIR in ${WORK_DIRS[@]}; do
 
       for SUBDIR in $WORK_DIR*/; do
 
-        if [[ -d $SUBDIR/.svn ]]; then
+        if [[ -d $SUBDIR/.svn ]] && [[ ! -e $SUBDIR/.svn/${SHY_FILE} ]]; then
           SVN_DIRS+=( $SUBDIR ) 
         fi
 
@@ -228,7 +248,7 @@ for WORK_DIR in ${WORK_DIRS[@]}; do
 
       for SUBDIR in $( find "$WORK_DIR" -maxdepth $MAX_DEPTH -type d -name .git -exec dirname {} \; 2>/dev/null ); do
 
-        if [[ -d $SUBDIR/.git ]]; then
+        if [[ -d $SUBDIR/.git ]] && [[ ! -e $SUBDIR/.git/${SHY_FILE} ]]; then
           GIT_DIRS+=( $SUBDIR ) 
         fi
 
@@ -238,11 +258,11 @@ for WORK_DIR in ${WORK_DIRS[@]}; do
 
     for SUBDIR in $( find "$WORK_DIR" -maxdepth $MAX_DEPTH  -type d -name .svn  -exec dirname {} \; -or -name .git -exec dirname {} \; 2>/dev/null | sort ); do
 
-        if [[ -d $SUBDIR/.svn ]]; then
+        if [[ -d $SUBDIR/.svn ]] && [[ ! -e $SUBDIR/.svn/${SHY_FILE} ]]; then
           SVN_DIRS+=( $SUBDIR ) 
         fi
 
-        if [[ -d $SUBDIR/.git ]]; then
+        if [[ -d $SUBDIR/.git ]] && [[ ! -e $SUBDIR/.git/${SHY_FILE} ]]; then
           GIT_DIRS+=( $SUBDIR ) 
         fi
 
@@ -253,7 +273,6 @@ for WORK_DIR in ${WORK_DIRS[@]}; do
   fi
 
 done
-
 
 #
 # then check their status
